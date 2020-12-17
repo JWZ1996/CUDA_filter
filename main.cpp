@@ -1,20 +1,22 @@
 #include <iostream>
-#include "FilterExecutor.h"
-#include "cudaPtr.h"
+#include <string>
+
+#include "include/FilterExecutor.h"
+#include "include/cudaPtr.h"
+
 
 
 
 int main()
 {
-	std::string filename{ "C:\\Users\\J A N E C K\\Desktop\\test.jpg" };
-
+	std::string filename("e:\\studia\\20Z\\RIM\\lena.png");
 	cv::Mat input = cv::imread(filename,cv::IMREAD_COLOR);
 
-	FilterExecutor(input).exec(FilterExecutorMode::GPU);
+	//FilterExecutor(FilterExecutorMode::CPU).exec(input);
 
 	cv::imshow(filename, input);
 
-	cv::waitKey();
+	cv::waitKey(); // unhandled exception
 
     return 0;
 }
