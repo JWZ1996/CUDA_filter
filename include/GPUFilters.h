@@ -10,6 +10,7 @@ struct IGPUFilter
 class BaseGPUFilter : public IGPUFilter 
 {
 protected:
+
 	cv::Mat& inputMat;
 public:
 	BaseGPUFilter(cv::Mat& inputImg) : inputMat{ inputImg } {};
@@ -26,7 +27,10 @@ public:
 
 class FFTGPUFilter : public BaseGPUFilter
 {
-
+	// kernel params
+	size_t kWidth = 15;
+	size_t kHeight = 15;
+	void filter(float* channel);
 public:
 	FFTGPUFilter(cv::Mat& inputImg);
 
