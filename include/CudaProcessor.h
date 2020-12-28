@@ -19,6 +19,7 @@ class CudaProcessor
 	cv::Mat channelToHost(uchar* gpuChannel);
 
 	size_t getImgSize();
+	size_t getImgBSize();
 
 public:
 

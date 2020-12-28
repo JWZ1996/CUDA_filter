@@ -4,7 +4,7 @@
 
 #include <algorithm>
 
-CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat { input }
+CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat(input)
 {
 	splitChannels();
 }
@@ -19,7 +19,7 @@ CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ fi
 	 });
 	 
 }
- void CudaProcessor::channelToGpu(cv::Mat& channel)
+ void CudaProcessor::channelToGpu(cv::Mat& channel) 
  {
 	 std::vector<uchar> data;
 	 data.reserve(getImgSize());
@@ -30,15 +30,15 @@ CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ fi
 		 data.insert(data.end(), segment_start, segment_start + inputMat.cols);
 	 }
 
-	 uchar* memStart{ nullptr };
-	 checkCudaErrors(cudaMalloc(&memStart, getImgSize()));
-	 checkCudaErrors(cudaMemcpy(memStart, data.data(), getImgSize(), cudaMemcpyHostToDevice));
-
-	 gpuChannelsData.emplace_back(memStart);
+	 gpuChannelsData.emplace_back(&data[0]);
  }
  size_t CudaProcessor::getImgSize()
  {
 	 return (inputMat.rows * inputMat.cols);
+ }
+
+ size_t CudaProcessor::getImgBSize() {
+	 return getImgSize() * sizeof(float);
  }
  void CudaProcessor::apply()
  {
@@ -47,10 +47,13 @@ CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ fi
 
 	     // Kanał w osobnym strumieniu
 	     // Wersja batchowana
+
          gpuFilter.filter(channel);
+		 
+		 // no resource deallocation?
      });
 
-	 merge(inputChannels, inputMat);
+	 merge(inputChannels, inputMat); 
  }
 
  void CudaProcessor::mergeChannels()
@@ -60,14 +63,10 @@ CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ fi
 		 inputChannels[i] = channelToHost(gpuChannelsData[i]);
 	 }
 
-	 //mergeChannels();
+	 //mergeChannels(); 
  }
  cv::Mat CudaProcessor::channelToHost(uchar* gpuChannel)
  {
-	 std::vector<uchar> data;
-	 data.reserve(getImgSize());
 
-	 checkCudaErrors(cudaMemcpy(data.data(), gpuChannel, getImgSize(), cudaMemcpyDeviceToHost));
-
-	 return cv::Mat(inputMat.rows, inputMat.cols, CV_8UC1, data.data());
+	 return cv::Mat(inputMat.rows, inputMat.cols, CV_8UC1, gpuChannel);
  }
