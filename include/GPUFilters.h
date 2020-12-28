@@ -1,13 +1,13 @@
 #pragma once
 #include  "opencv2\opencv.hpp"
 
-struct IGPUFilter 
+struct IGPUFilter
 {
 	virtual void filter(uchar* channel) = 0;
 
 };
 
-class BaseGPUFilter : public IGPUFilter 
+class BaseGPUFilter : public IGPUFilter
 {
 protected:
 	cv::Mat& inputMat;
@@ -15,11 +15,11 @@ public:
 	BaseGPUFilter(cv::Mat& inputImg) : inputMat{ inputImg } {};
 };
 
-class WarpGPUFilter : public BaseGPUFilter
+class ConvGPUFilter : public BaseGPUFilter
 {
 
 public:
-	WarpGPUFilter(cv::Mat& inputImg);
+	ConvGPUFilter(cv::Mat& inputImg);
 
 	void filter(uchar* channel) override;
 };
@@ -32,4 +32,3 @@ public:
 
 	void filter(uchar* channel) override;
 };
-
