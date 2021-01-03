@@ -43,7 +43,7 @@ void CudaProcessor::apply()
 	std::for_each(std::begin(gpuChannelsData), std::end(gpuChannelsData), [this](auto& channel)
 	{
 
-		// Kana� w osobnym strumieniu
+		// Kanał w osobnym strumieniu
 		// Wersja batchowana
 		gpuFilter.filter(channel);
 		// no resource deallocation?
