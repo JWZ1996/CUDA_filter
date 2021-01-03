@@ -12,4 +12,3 @@ class FFTGPUFilterAdapter : public BaseFilterAdapter
 {
 	void apply(cv::Mat& img) override;
 };
-
