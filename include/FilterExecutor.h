@@ -5,12 +5,12 @@
 #include "FilterAdapters.h"
 
 
-typedef std::array<std::unique_ptr<IFilterAdapter>,3u> FilterPool;
+typedef std::array<std::unique_ptr<IFilterAdapter>, 3u> FilterPool;
 
 enum FilterExecutorMode
 {
-	CPU     = 0u,
-	GPU     = 1u,
+	CPU = 0u,
+	GPU = 1u,
 	GPU_FFT = 2u
 };
 
@@ -29,4 +29,3 @@ public:
 
 	void exec(cv::Mat& imgRef);
 };
-

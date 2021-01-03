@@ -1,6 +1,6 @@
-#include "../include/BaseFilterAdapter.h"
+#include "BaseFilterAdapter.h"
 
-class CPUFilterAdapter : public BaseFilterAdapter 
+class CPUFilterAdapter : public BaseFilterAdapter
 {
-	 void apply(cv::Mat& img) override;
+	void apply(cv::Mat& img) override;
 };

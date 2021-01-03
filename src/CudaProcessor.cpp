@@ -1,73 +1,64 @@
-﻿#include "../include/CudaProcessor.h"
-#include "../include/cudaPtr.h"
+#include "../include/CudaProcessor.h"
 #include "helper_cuda.h"
 
 #include <algorithm>
-
-CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat { input }
+CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat(input)
 {
+	inputMat.convertTo(inputMat, CV_32F, 1 / 255.0f);
 	splitChannels();
 }
 
- void CudaProcessor::splitChannels()
+void CudaProcessor::splitChannels()
 {
-	 cv::split(inputMat, inputChannels);
+	cv::split(inputMat, inputChannels);
 
-	 std::for_each(std::begin(inputChannels), std::end(inputChannels), [this](auto& channel)
-	 {
-			 channelToGpu(channel);
-	 });
-	 
+	std::for_each(std::begin(inputChannels), std::end(inputChannels), [this](auto& channel)
+	{
+		channelToGpu(channel);
+	});
+
 }
- void CudaProcessor::channelToGpu(cv::Mat& channel)
- {
-	 std::vector<uchar> data;
-	 data.reserve(getImgSize());
+void CudaProcessor::channelToGpu(cv::Mat& channel)
+{
+	std::vector<float> data;
 
-	 for (int i = 0; i < inputMat.rows; i++)
-	 {
-		 uchar* segment_start = inputMat.data + i * inputMat.step;
-		 data.insert(data.end(), segment_start, segment_start + inputMat.cols);
-	 }
+	if (channel.isContinuous())
+	{
+		data.assign((float*)channel.data, (float*)channel.data + channel.total() * channel.channels());
+	}
+	else
+	{
+		for (int i = 0; i < channel.rows; ++i)
+		{
+			data.insert(data.end(), channel.ptr<float>(i), channel.ptr<float>(i) + channel.cols * channel.channels());
+		}
+	}
 
-	 uchar* memStart{ nullptr };
-	 checkCudaErrors(cudaMalloc(&memStart, getImgSize()));
-	 checkCudaErrors(cudaMemcpy(memStart, data.data(), getImgSize(), cudaMemcpyHostToDevice));
+	gpuChannelsData.emplace_back(data);
+}
 
-	 gpuChannelsData.emplace_back(memStart);
- }
- size_t CudaProcessor::getImgSize()
- {
-	 return (inputMat.rows * inputMat.cols);
- }
- void CudaProcessor::apply()
- {
-	 std::for_each(std::begin(gpuChannelsData), std::end(gpuChannelsData), [this](auto& channel)
-     {
+void CudaProcessor::apply()
+{
 
-	     // Kanał w osobnym strumieniu
-	     // Wersja batchowana
-         gpuFilter.filter(channel);
-     });
+	std::for_each(std::begin(gpuChannelsData), std::end(gpuChannelsData), [this](auto& channel)
+	{
 
-	 merge(inputChannels, inputMat);
- }
+		// Kana� w osobnym strumieniu
+		// Wersja batchowana
+		gpuFilter.filter(channel);
+		// no resource deallocation?
+	});
 
- void CudaProcessor::mergeChannels()
- {
-	 for (size_t i = 0; i < inputChannels.size(); i++)
-	 {
-		 inputChannels[i] = channelToHost(gpuChannelsData[i]);
-	 }
+	for (int k = 0; k < inputChannels.size(); k++)
+	{
+		for (int i = 0; i < inputMat.rows; i++)
+		{
+			for (int j = 0; j < inputMat.cols; j++)
+			{
+				inputChannels[k].at<float>(i, j) = gpuChannelsData[k][i * inputMat.rows + j];
+			}
+		}
+	}
 
-	 //mergeChannels();
- }
- cv::Mat CudaProcessor::channelToHost(uchar* gpuChannel)
- {
-	 std::vector<uchar> data;
-	 data.reserve(getImgSize());
-
-	 checkCudaErrors(cudaMemcpy(data.data(), gpuChannel, getImgSize(), cudaMemcpyDeviceToHost));
-
-	 return cv::Mat(inputMat.rows, inputMat.cols, CV_8UC1, data.data());
- }
+	cv::merge(inputChannels, inputMat);
+}

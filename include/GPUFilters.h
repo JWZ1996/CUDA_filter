@@ -3,7 +3,7 @@
 
 struct IGPUFilter
 {
-	virtual void filter(uchar* channel) = 0;
+	virtual void filter(std::vector<float> &channel) = 0;
 
 };
 
@@ -21,14 +21,18 @@ class ConvGPUFilter : public BaseGPUFilter
 public:
 	ConvGPUFilter(cv::Mat& inputImg);
 
-	void filter(uchar* channel) override;
+	void filter(std::vector<float> &channel) override;
 };
 
 class FFTGPUFilter : public BaseGPUFilter
 {
-
+	// kernel params
+	size_t kWidth = 15;
+	size_t kHeight = 15;
+	void filter(cv::Mat channel);
 public:
 	FFTGPUFilter(cv::Mat& inputImg);
 
-	void filter(uchar* channel) override;
+	void filter(std::vector<float> &channel) override;
 };
+

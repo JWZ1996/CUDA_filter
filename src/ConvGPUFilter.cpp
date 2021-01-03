@@ -1,72 +1,180 @@
-#include "GPUFilters.h"
+#include <iostream>
+#include <iterator>
+#include <numeric>
 
-#define _USE_MATH_DEFINES
+#include "../include/GPUFilters.h"
+#include "helper_cuda.h"
+#include "cuda_runtime.h"
+#include "KernelGenerator.h"
+
 #define FILTER_ORDER 1 // 1, ..., N; FILTER_ORDER = 2 * FILTER_ORDER + 1, FILTER_ORDERxFILTER_ORDER
+const int TILE_SIZE = 16;
+
+#define CONVFILTER2
+//#define CONVFILTER1
 
 //SELECT ONLY ONE TYPE OF FILTER:
-//#define SOBEL_FILTER
-#define MEDIAN_FILTER
-//#define SHARPEN_FILTER
-//#define GAUSIAN_FILTER
+//#define MEDIAN_KERNEL
+#define GAUSIAN_KERNEL
+//#define PREWITT_HORIZONTAL_KERNEL
+//#define PREWITT_VERTICAL_KERNEL
+//#define SOBEL_HORIZONTAL_KERNEL
+//#define SOBEL_VERTICAL_KERNEL
 
-ConvGPUFilter::ConvGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg)
-{
+// WERSJA CONVFILTER2 - ze stala maska
+__constant__ float KERNEL[(2 * FILTER_ORDER + 1) * (2 * FILTER_ORDER + 1)];
+__global__ void ConvFilter2(float* input, float* output, int width, int height, int kernelSize) {
 
+	float sum = 0.0f;
+	int col = threadIdx.x + blockIdx.x * blockDim.x;
+	int row = threadIdx.y + blockIdx.y * blockDim.y;
+	int maskRowsRadius = kernelSize / 2;
+	int maskColsRadius = kernelSize / 2;
+
+	if (row < height && col < width) {
+		sum = 0.0f;
+		int startRow = row - maskRowsRadius;
+		int startCol = col - maskColsRadius;
+
+		for (int i = 0; i < kernelSize; i++) {
+
+			for (int j = 0; j < kernelSize; j++) {
+
+				int currentRow = startRow + i;
+				int currentCol = startCol + j;
+
+				if (currentRow >= 0 && currentRow < height && currentCol >= 0 && currentCol < width)
+				{
+
+					sum += input[currentRow * width + currentCol] * KERNEL[i * kernelSize + j];
+				}
+				else
+				{
+					sum = 0.0f;
+				}
+			}
+
+		}
+		output[row * width + col] = sum;
+	}
 }
 
-void ConvGPUFilter::filter(uchar* channel)
-{
+// WERSJA CONVFILTER1 - podstawowa
+__global__ void ConvFilter1(float* input,  float*  kernel,
+	float* output, int width, int height, int kernelSize) {
 
-	//rows = y
-	//cols = x
-	const int cols = this->inputMat.cols, rows = this->inputMat.rows;
 
-	int kernelSize = 2 * FILTER_ORDER + 1;
+	float sum = 0.0f;
+	int col = threadIdx.x + blockIdx.x * blockDim.x;   
+	int row = threadIdx.y + blockIdx.y * blockDim.y;
+	int maskRowsRadius = kernelSize / 2;
+	int maskColsRadius = kernelSize / 2;
 
-	cv::Mat  kernel{ cv::Mat::ones(kernelSize, kernelSize, CV_32F) };
+		if (row < height && col < width) {
+			sum = 0.0f;
+			int startRow = row - maskRowsRadius;  
+			int startCol = col - maskColsRadius;  
 
-#ifdef MEDIAN_FILTER
-	kernel = kernel / (float)(kernelSize * kernelSize);
-#endif
+			for (int i = 0; i < kernelSize; i++) {
 
-#ifdef SOBEL_FILTER
-	cv::Mat  kernel{ cv::Mat::ones(kernelSize, kernelSize, CV_32F) / (float)(kernelSize * kernelSize) };
-#endif
+				for (int j = 0; j < kernelSize; j++) {
 
-#ifdef GAUSIAN_FILTER
-	for (int i = 0; i < kernelSize; i++)
-	{
-		for (int j = 0; j < kernelSize; j++)
-		{
-			kernel.at<float>(i, j) = (1 / (2 * 3.14 * 0.5)) * expf(-(i * i + j * j) / (2 * 0.5 * 0.5));
-		}
-	}
-#endif
+					int currentRow = startRow + i;
+					int currentCol = startCol + j;
 
-	uchar sum = 0u;
-	for (int img_y = 0; img_y <= rows - kernelSize; img_y++)
-	{
-		for (int img_x = 0; img_x <= cols - kernelSize; img_x++)
-		{
-			sum = 0u;
+					if (currentRow >= 0 && currentRow < height && currentCol >= 0 && currentCol < width) 
+					{
 
-			for (int kernel_y = 0; kernel_y < kernel.rows; kernel_y++)
-			{
-				for (int kernel_x = 0; kernel_x < kernel.cols; kernel_x++)
-				{
-						//sum = sum + kernel.at<float>(kernel_y, kernel_x) * channel(img_y + kernel_y, img_x + kernel_x);
-
+						sum += input[currentRow * width + currentCol] * kernel[i * kernelSize + j];
+					}
+					else
+					{
+						sum = 0.0f;
+					}
 				}
 
 			}
-
-			/*if (sum > 255u)
-				channel(img_y, img_x) = 255u;
-			else if (sum < 0u)
-				channel(img_y, img_x) = 0u;
-			else
-				channel(img_y, img_x)= sum;*/
-			
+			output[row * width + col] = sum;
 		}
-	}
+}
+
+ConvGPUFilter::ConvGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg) {}
+
+void ConvGPUFilter::filter(std::vector<float>& channel)
+{
+	//rows = y
+	//cols = x
+	const int cols = inputMat.cols, rows = inputMat.rows;
+	const int kernelSize = 2 * FILTER_ORDER + 1;
+
+	float *kernelInput = new float[kernelSize * kernelSize];
+	float *photoInput = &channel[0];
+	float *photoOutput = new float[cols * rows];
+
+#ifdef MEDIAN_KERNEL
+		KernelGenerator::generateMedianKernel(kernelInput, kernelSize);
+#endif
+
+#ifdef GAUSIAN_KERNEL
+		KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, 0.5);
+#endif
+
+#ifdef PREWITT_HORIZONTAL_KERNEL
+		KernelGenerator::returnPrewittHorizontalKernel(kernelInput);
+#endif	
+
+#ifdef PREWITT_VERTICAL_KERNEL
+		KernelGenerator::returnPrewittVerticalKernel(kernelInput);
+#endif
+
+#ifdef SOBEL_HORIZONTAL_KERNEL
+		KernelGenerator::returnSobelHorizontalKernel(kernelInput);
+#endif	
+
+#ifdef SOBEL_VERTICAL_KERNEL
+		KernelGenerator::returnSobelVerticalKernel(kernelInput);
+#endif
+
+	checkCudaErrors(cudaSetDevice(0));
+
+	float *devInputPhoto,  
+		  *devOutputPhoto,
+		  *devKernel;
+		
+	checkCudaErrors(cudaMalloc((void**)&devInputPhoto, cols * rows  * sizeof(float)));
+	checkCudaErrors(cudaMalloc((void**)&devKernel, kernelSize * kernelSize * sizeof(float)));
+	checkCudaErrors(cudaMalloc((void**)&devOutputPhoto, cols * rows * sizeof(float)));
+
+	checkCudaErrors(cudaMemcpy(devInputPhoto, photoInput, cols * rows * sizeof(float), cudaMemcpyHostToDevice));
+
+	dim3 dimGrid(ceil((float)cols / TILE_SIZE),
+		ceil((float)rows / TILE_SIZE));
+	dim3 dimBlock(TILE_SIZE, TILE_SIZE, 1);
+
+#ifdef CONVFILTER2
+	checkCudaErrors(cudaMemcpyToSymbol(KERNEL, kernelInput, kernelSize * kernelSize * sizeof(float)));
+	ConvFilter2 <<< dimGrid, dimBlock >>> (devInputPhoto, devOutputPhoto, cols, rows, kernelSize);
+#endif	
+
+#ifdef CONVFILTER1
+	checkCudaErrors(cudaMemcpy(devKernel, kernelInput, kernelSize * kernelSize * sizeof(float), cudaMemcpyHostToDevice));
+	ConvFilter1 <<< dimGrid, dimBlock >>> (devInputPhoto, devKernel, devOutputPhoto, cols, rows, kernelSize);
+#endif
+
+	checkCudaErrors(cudaGetLastError());
+
+	checkCudaErrors(cudaDeviceSynchronize());
+	checkCudaErrors(cudaMemcpy(photoOutput, devOutputPhoto, cols * rows * sizeof(float), cudaMemcpyDeviceToHost));
+
+	//przeniesienie danych z tablicy do vectora
+	std::memcpy(&channel[0], photoOutput, cols * rows * sizeof(float));
+
+	cudaFree(devInputPhoto);
+	cudaFree(devOutputPhoto);
+	cudaFree(devKernel);
+
+	photoInput = 0;
+	delete kernelInput;
+	delete photoInput;
+	delete photoOutput;
 }

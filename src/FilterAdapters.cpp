@@ -1,17 +1,17 @@
-#include "FilterAdapters.h"
-
-#include <iostream>
+#include "../include/FilterAdapters.h"
+#include "KernelGenerator.h"
 #include <vector>
-#include <cmath>
 
-#define _USE_MATH_DEFINES
+//SELECT ONLY ONE TYPE OF FILTER:
 #define FILTER_ORDER 1 // 1, ..., N; FILTER_ORDER = 2 * FILTER_ORDER + 1, FILTER_ORDERxFILTER_ORDER
 
 //SELECT ONLY ONE TYPE OF FILTER:
-//#define SOBEL_FILTER
-#define MEDIAN_FILTER
-//#define SHARPEN_FILTER
-//#define GAUSIAN_FILTER
+//#define MEDIAN_KERNEL
+#define GAUSIAN_KERNEL
+//#define PREWITT_HORIZONTAL_KERNEL
+//#define PREWITT_VERTICAL_KERNEL
+//#define SOBEL_HORIZONTAL_KERNEL
+//#define SOBEL_VERTICAL_KERNEL
 
 void CPUFilterAdapter::apply(cv::Mat& img)
 {
@@ -22,30 +22,45 @@ void CPUFilterAdapter::apply(cv::Mat& img)
 	int kernelSize = 2 * FILTER_ORDER + 1;
 
 	cv::Mat  kernel{ cv::Mat::ones(kernelSize, kernelSize, CV_32F) };
+	
+	float* kernelInput = new float[kernelSize * kernelSize];
 
-#ifdef MEDIAN_FILTER
-	kernel = kernel / (float)(kernelSize * kernelSize);
+
+#ifdef MEDIAN_KERNEL
+	KernelGenerator::generateMedianKernel(kernelInput, kernelSize);
 #endif
 
-#ifdef SOBEL_FILTER
-	cv::Mat  kernel{ cv::Mat::ones(kernelSize, kernelSize, CV_32F) / (float)(kernelSize * kernelSize) };
+#ifdef GAUSIAN_KERNEL
+	KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, 0.5);
 #endif
 
-#ifdef GAUSIAN_FILTER
+#ifdef PREWITT_HORIZONTAL_KERNEL
+	KernelGenerator::returnPrewittHorizontalKernel(kernelInput);
+#endif	
+
+#ifdef PREWITT_VERTICAL_KERNEL
+	KernelGenerator::returnPrewittVerticalKernel(kernelInput);
+#endif
+
+#ifdef SOBEL_HORIZONTAL_KERNEL
+	KernelGenerator::returnSobelHorizontalKernel(kernelInput);
+#endif	
+
+#ifdef SOBEL_VERTICAL_KERNEL
+	KernelGenerator::returnSobelVerticalKernel(kernelInput);
+#endif
+
 	for (int i = 0; i < kernelSize; i++)
-	{
 		for (int j = 0; j < kernelSize; j++)
-		{
-			kernel.at<float>(i, j) = (1 / (2 * 3.14 * 0.5)) * expf(-(i * i + j * j) / (2 * 0.5 * 0.5));
-		}
-	}
-#endif
+			kernel.at<float>(i, j) = kernelInput[i * kernelSize + j];
+
 
 	img.convertTo(img, CV_32F, 1/255.0f);
 	cv::Mat channels[3], merged_photo;
 	cv::split(img, channels);
 
-	float sum[3] = { 0.0f, 0.0f, 0.0f };
+	/*float sum[3] = { 0.0f, 0.0f, 0.0f };
+
 	for (int img_y = 0; img_y <= rows - kernelSize; img_y++)
 	{
 		for (int img_x = 0; img_x <= cols - kernelSize; img_x++)
@@ -73,13 +88,13 @@ void CPUFilterAdapter::apply(cv::Mat& img)
 					channels[i].at<float>(img_y, img_x) = sum[i];
 			}			
 		}
-	}
+	}*/
+
+	for (int i = 0; i < 3; i++)
+		cv::filter2D(channels[i], channels[i], -1, kernel);
 
 	std::vector<cv::Mat> channels_vec = {channels[0], channels[1], channels[2]};
 	cv::merge(channels_vec, img);
-	//cv::imshow("merged", merged_photo);
-
-	//cv::filter2D(img, img, -1, kernel);
 }
 
 void GPUFilterAdapter::apply(cv::Mat& img)
