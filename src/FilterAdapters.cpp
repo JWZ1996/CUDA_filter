@@ -1,17 +1,7 @@
 #include "../include/FilterAdapters.h"
+#include "../include/CompilationFlags.h"
 #include "KernelGenerator.h"
 #include <vector>
-
-//SELECT ONLY ONE TYPE OF FILTER:
-#define FILTER_ORDER 1 // 1, ..., N; FILTER_ORDER = 2 * FILTER_ORDER + 1, FILTER_ORDERxFILTER_ORDER
-
-//SELECT ONLY ONE TYPE OF FILTER:
-//#define MEDIAN_KERNEL
-#define GAUSIAN_KERNEL
-//#define PREWITT_HORIZONTAL_KERNEL
-//#define PREWITT_VERTICAL_KERNEL
-//#define SOBEL_HORIZONTAL_KERNEL
-//#define SOBEL_VERTICAL_KERNEL
 
 void CPUFilterAdapter::apply(cv::Mat& img)
 {
@@ -31,7 +21,7 @@ void CPUFilterAdapter::apply(cv::Mat& img)
 #endif
 
 #ifdef GAUSIAN_KERNEL
-	KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, 0.5);
+	KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, SIGMA);
 #endif
 
 #ifdef PREWITT_HORIZONTAL_KERNEL
