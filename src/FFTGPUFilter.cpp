@@ -1,4 +1,5 @@
 #include "../include/GPUFilters.h"
+// cuh kernel
 
 FFTGPUFilter::FFTGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg)
 {
