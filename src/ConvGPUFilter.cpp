@@ -5,31 +5,20 @@
 #include "../include/GPUFilters.h"
 #include "helper_cuda.h"
 #include "cuda_runtime.h"
-#include "KernelGenerator.h"
+#include "../include/KernelGenerator.h"
+#include "../include/CompilationFlags.h"
 
-#define FILTER_ORDER 1 // 1, ..., N; FILTER_ORDER = 2 * FILTER_ORDER + 1, FILTER_ORDERxFILTER_ORDER
 const int TILE_SIZE = 16;
-
-#define CONVFILTER2
-//#define CONVFILTER1
-
-//SELECT ONLY ONE TYPE OF FILTER:
-//#define MEDIAN_KERNEL
-#define GAUSIAN_KERNEL
-//#define PREWITT_HORIZONTAL_KERNEL
-//#define PREWITT_VERTICAL_KERNEL
-//#define SOBEL_HORIZONTAL_KERNEL
-//#define SOBEL_VERTICAL_KERNEL
+__constant__ float KERNEL[(2 * FILTER_ORDER + 1) * (2 * FILTER_ORDER + 1)];
 
 // WERSJA CONVFILTER2 - ze stala maska
-__constant__ float KERNEL[(2 * FILTER_ORDER + 1) * (2 * FILTER_ORDER + 1)];
 __global__ void ConvFilter2(float* input, float* output, int width, int height, int kernelSize) {
 
 	float sum = 0.0f;
 	int col = threadIdx.x + blockIdx.x * blockDim.x;
 	int row = threadIdx.y + blockIdx.y * blockDim.y;
-	int maskRowsRadius = kernelSize / 2;
-	int maskColsRadius = kernelSize / 2;
+	int maskRowsRadius = kernelSize >> 1;
+	int maskColsRadius = kernelSize >> 1;
 
 	if (row < height && col < width) {
 		sum = 0.0f;
@@ -67,8 +56,8 @@ __global__ void ConvFilter1(float* input,  float*  kernel,
 	float sum = 0.0f;
 	int col = threadIdx.x + blockIdx.x * blockDim.x;   
 	int row = threadIdx.y + blockIdx.y * blockDim.y;
-	int maskRowsRadius = kernelSize / 2;
-	int maskColsRadius = kernelSize / 2;
+	int maskRowsRadius = kernelSize >> 1;
+	int maskColsRadius = kernelSize >> 1;
 
 		if (row < height && col < width) {
 			sum = 0.0f;
@@ -116,7 +105,7 @@ void ConvGPUFilter::filter(std::vector<float>& channel)
 #endif
 
 #ifdef GAUSIAN_KERNEL
-		KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, 0.5);
+		KernelGenerator::generateGaussianKernel(kernelInput, kernelSize, SIGMA);
 #endif
 
 #ifdef PREWITT_HORIZONTAL_KERNEL
