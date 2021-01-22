@@ -7,11 +7,11 @@
     <Filter Include="include">
       <UniqueIdentifier>{0aa42fb4-b291-4664-8500-1f62708962d9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="gpu">
+      <UniqueIdentifier>{1fc13f45-888d-47df-b673-2d908097e4b5}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="src\CPUFilterAdapter.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="src\CudaProcessor.cpp">
       <Filter>src</Filter>
     </ClCompile>
@@ -24,25 +24,16 @@
     <ClCompile Include="src\FilterExecutor.cpp">
       <Filter>src</Filter>
     </ClCompile>
-    <ClCompile Include="src\GPUFilterAdapter.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\NormalGPUFilter.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
-    <ClCompile Include="src\UNUSED_FilterMask.cpp">
-      <Filter>src</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="src\KernelGenerator.cpp">
+      <Filter>src</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\CPUFilterAdapter.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\CudaProcessor.h">
-      <Filter>include</Filter>
-    </ClInclude>
-    <ClInclude Include="include\cudaPtr.h">
       <Filter>include</Filter>
     </ClInclude>
     <ClInclude Include="include\FilterAdapters.h">
@@ -57,8 +48,26 @@
     <ClInclude Include="include\GPUFilters.h">
       <Filter>include</Filter>
     </ClInclude>
-    <ClInclude Include="include\UNUSED_FilterMask.h">
+    <ClInclude Include="include\BaseFilterAdapter.h">
       <Filter>include</Filter>
     </ClInclude>
+    <ClInclude Include="include\CompilationFlags.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\KernelGenerator.h">
+      <Filter>include</Filter>
+    </ClInclude>
+    <ClInclude Include="FFTGPU_Common.h">
+      <Filter>gpu</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <CudaCompile Include="FFTGPUFilter.cuh">
+      <Filter>gpu</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\ConvGPUFilter.cpp" />
+    <CudaCompile Include="kernels.cu">
+      <Filter>gpu</Filter>
+    </CudaCompile>
   </ItemGroup>
 </Project>

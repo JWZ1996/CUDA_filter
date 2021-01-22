@@ -27,11 +27,15 @@ public:
 
 class FFTGPUFilter : public BaseGPUFilter
 {
-	// kernel params
-	size_t kWidth = 15;
-	size_t kHeight = 15;
+private:
+	// image params
+	size_t width;
+	size_t height;
+	size_t cutoff_frequencies = 0.1;
+
   void filter(cv::Mat channel);
 public:
+
 	FFTGPUFilter(cv::Mat& inputImg);
 
 	void filter(std::vector<float> &channel) override;

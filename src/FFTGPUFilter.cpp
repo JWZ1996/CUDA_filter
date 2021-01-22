@@ -1,15 +1,12 @@
 #include "../include/GPUFilters.h"
-// cuh kernel
 
-FFTGPUFilter::FFTGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg)
-{
-	// instatiate kernel params
-	kWidth = inputImg.cols / 10;
-	kHeight = inputImg.rows / 10;
-}
+
+#include "../FFTGPU_Common.h"
+
+
+FFTGPUFilter::FFTGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg) , width(inputImg.cols), height(inputImg.rows) { }
 
 void FFTGPUFilter::filter(std::vector<float>& channel) // only 1-channel
 {
-	/*for (int i = 0; i < kWidth * kHeight; i++)
-		channel[i] = 255;*/
+	filter_CUFFT(&channel[0], width, height, 0.3f);
 }

@@ -1,4 +1,5 @@
 #include "../include/GPUFilterAdapter.h"
+#include "../include/CudaProcessor.h"
 
 void GPUFilterAdapter::apply(cv::Mat& img)
 {
@@ -7,5 +8,5 @@ void GPUFilterAdapter::apply(cv::Mat& img)
 
 void FFTGPUFilterAdapter::apply(cv::Mat& img)
 {
-	//CudaProcessor(img).apply();
+	CudaProcessor(img).apply();
 }

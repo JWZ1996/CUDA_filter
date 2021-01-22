@@ -1,6 +1,6 @@
 #include "../include/CudaProcessor.h"
 #include "helper_cuda.h"
-
+#include <iostream>
 #include <algorithm>
 CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat(input)
 {
@@ -45,17 +45,18 @@ void CudaProcessor::apply()
 
 		// Kanał w osobnym strumieniu
 		// Wersja batchowana
+		std::cout << "filterring...";
 		gpuFilter.filter(channel);
 		// no resource deallocation?
 	});
 
-	for (int k = 0; k < inputChannels.size(); k++)
+	for (int k = 0; k < 3; k++)
 	{
 		for (int i = 0; i < inputMat.rows; i++)
 		{
 			for (int j = 0; j < inputMat.cols; j++)
 			{
-				inputChannels[k].at<float>(i, j) = gpuChannelsData[k][i * inputMat.rows + j];
+					inputChannels[k].at<float>(i, j) = gpuChannelsData[k][i * inputMat.rows + j];
 			}
 		}
 	}
