@@ -3,6 +3,8 @@
 #include <iostream>
 #include <algorithm>
 
+#include <chrono>
+
 CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat(input)
 {
 	inputMat.convertTo(inputMat, CV_32F, 1 / 255.0f);
@@ -43,11 +45,13 @@ void CudaProcessor::apply()
 
 	std::for_each(std::begin(gpuChannelsData), std::end(gpuChannelsData), [this](auto& channel)
 	{
-
 		// Kanał w osobnym strumieniu
 		// Wersja batchowana
-		std::cout << "filterring...";
+		auto start = std::chrono::steady_clock::now();
 		gpuFilter.filter(channel);
+		auto end = std::chrono::steady_clock::now();
+		std::chrono::duration<double> elapsed_seconds = end - start;
+		std::cout << "Single channel time " << elapsed_seconds.count() << "s\n";
 		// no resource deallocation?
 	});
 

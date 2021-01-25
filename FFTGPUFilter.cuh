@@ -1,4 +1,4 @@
-// Include CUDA runtime and CUFFT
+﻿// Include CUDA runtime and CUFFT
 #include <cuda_runtime.h>
 #include <cufft.h>
 
@@ -129,12 +129,24 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 
 	// fft convolution
 	checkCudaErrors(cudaDeviceSynchronize());
+	
+	
+	cudaEvent_t start, stop; // pomiar czasu wykonania jądra
+	checkCudaErrors(cudaEventCreate(&start));
+	checkCudaErrors(cudaEventCreate(&stop));
+	checkCudaErrors(cudaEventRecord(start, 0));
+
 	checkCudaErrors(cufftExecC2C(fftPlanFwd, (cufftComplex *)dChannelPadded, (cufftComplex *)dDataSpectrum, CUFFT_FORWARD));
+
+
+
 	dim3 block(32, 32);
 	dim3 grid(iDivUp(fftWidth, block.x), iDivUp(fftHeight, block.y));
 	
-	// cut frequencies kernel
 	
+
+	/* ###### KERNELS ###### */
+	// cut frequencies kernel
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
 	if(isLowPass)
 		lowPassFilter <<<grid, block >>> (
@@ -156,27 +168,32 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 			);
 
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
+	/* ######### END KERNELS ####### */
+
+	
 
 
 	//// inverse transformation
 	checkCudaErrors(cufftExecC2C(fftPlanInv, (cufftComplex *)dDataSpectrum, (cufftComplex *)dChannelPadded, CUFFT_INVERSE));
 
+	
+	checkCudaErrors(cudaEventRecord(stop, 0));
+	checkCudaErrors(cudaEventSynchronize(stop));
+	float elapsedTime;
+	checkCudaErrors(cudaEventElapsedTime(&elapsedTime,
+		start, stop));
+	checkCudaErrors(cudaEventDestroy(start));
+	checkCudaErrors(cudaEventDestroy(stop));
+	printf("GPU (kernel) time = %.3f ms\n", elapsedTime);
+
 	checkCudaErrors(cudaDeviceSynchronize());
 	
-	printf("...reading back GPU convolution results\n");
-	
 	checkCudaErrors(cudaMemcpy(hPadded, dChannelPadded, fftWidth  * fftHeight * sizeof(fComplex), cudaMemcpyDeviceToHost));
-	printf("s %f %f", hPadded[0], hPadded[1]);
+	
 	padData(hChannel, hPadded, fftWidth, fftHeight, hWidth, hHeight, false);
 	
 	// normalize
-	printf("s %f %f", hChannel[0], hChannel[1]);
-
-	/*const float norm = 1.0f / (fftWidth * fftHeight);
-	for (int j = 0; j < hWidth * hHeight; j++)
-		hChannel[j] = hChannel[j] * norm;*/
 	
-	printf("s %f %f", hChannel[0], hChannel[1]);
 	// free resources
 	checkCudaErrors(cufftDestroy(fftPlanInv));
 	checkCudaErrors(cufftDestroy(fftPlanFwd));
