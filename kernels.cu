@@ -3,14 +3,42 @@
 
 
 
-typedef float2 fComplex;
+#include "FFTGPU_Kernels.cuh"
 
-__constant__  float2 dZero;
-//__constant__  float dFact;
+__device__ bool lowPassK(int centerX, int centerY, size_t sqradius) {
+	return centerX * centerX + centerY * centerY >= sqradius;
+}
 
+__device__ bool highPassK(int centerX, int centerY, size_t sqradius) {
+	return centerX * centerX + centerY * centerY < sqradius;
+}
 
-// function for in-place cutting frequencies from image
-__global__ void cutFrequencies(
+__device__ void cutFrequencies(
+	fComplex *dData,
+	int fftH,
+	int fftW,
+	int imageW,
+	int imageH,
+	const size_t sqradius,
+	bool(*func)(int, int, size_t)
+
+)
+{
+	const int y = blockDim.y * blockIdx.y + threadIdx.y;
+	const int x = blockDim.x * blockIdx.x + threadIdx.x;
+
+	const int centerX = fftW >> 1;
+	const int centerY = fftH >> 1;
+	const int coorY = y - centerY;
+	const int coorX = x - centerX;
+	if (func(coorX, coorY, sqradius)) {
+		const int ind = y * fftW + x;
+		dData[ind].x = 0.0f;
+		dData[ind].y = 0.0f;
+	}
+}
+
+__global__ void lowPassFilter(
 	fComplex *dData,
 	int fftH,
 	int fftW,
@@ -19,21 +47,24 @@ __global__ void cutFrequencies(
 	const size_t sqradius
 )
 {
-	const int y = blockDim.y * blockIdx.y + threadIdx.y;
-	const int x = blockDim.x * blockIdx.x + threadIdx.x;
-	
-	if (x < fftW && y < fftH) {
-		const int centerX = fftW >> 1;
-		const int centerY = fftH >> 1;
-		const int coorY = (y - centerY);
-		const int coorX = (x - centerX);
-		if (coorX * coorX + coorY * coorY > sqradius) {
-			const int ind = y * fftW + x;
-			dData[ind].x = 0.0f;
-			dData[ind].y = 0.0f;
-		}
-	}
+	cutFrequencies(dData, fftH, fftW, imageW, imageH, sqradius, &lowPassK);
 }
+
+__global__ void highPassFilter(
+	fComplex *dData,
+	int fftH,
+	int fftW,
+	int imageW,
+	int imageH,
+	const size_t sqradius
+)
+{
+	cutFrequencies(dData, fftH, fftW, imageW, imageH, sqradius, &highPassK);
+}
+
+
+
+
 
 __global__ void fftShift(
 	fComplex *dData,
@@ -46,8 +77,8 @@ __global__ void fftShift(
 
 	const int ind = y * fftW + x;
 	int shiftX, shiftY;
-	const int centerX = fftW >> 1;
-	const int centerY = fftH >> 1;
+	const int centerX = fftW / 2;
+	const int centerY = fftH / 2;
 	if (x < fftW && y < centerY) {
 
 		// 1q to 4q
@@ -64,6 +95,7 @@ __global__ void fftShift(
 		//const int indShift = shiftY * imageW + shiftX;
 		const fComplex v = fComplex{ dData[ind].x, dData[ind].y };
 		const int indShift = fftW * shiftY +  shiftX;
+
 		dData[ind].x = dData[indShift].x;
 		dData[ind].y = dData[indShift].y;
 

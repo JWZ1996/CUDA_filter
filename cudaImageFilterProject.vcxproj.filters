@@ -60,13 +60,18 @@
     <ClInclude Include="FFTGPU_Common.h">
       <Filter>gpu</Filter>
     </ClInclude>
+    <ClInclude Include="FFTGPU_Kernels.cuh">
+      <Filter>gpu</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="FFTGPUFilter.cuh">
       <Filter>gpu</Filter>
     </CudaCompile>
-    <CudaCompile Include="src\ConvGPUFilter.cpp" />
     <CudaCompile Include="kernels.cu">
+      <Filter>gpu</Filter>
+    </CudaCompile>
+    <CudaCompile Include="src\ConvGPUFilter.cpp">
       <Filter>gpu</Filter>
     </CudaCompile>
   </ItemGroup>

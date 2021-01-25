@@ -9,7 +9,7 @@
 #include <math.h>
 
 #include "FFTGPU_Common.h"
-#include "kernels.cu"
+#include "FFTGPU_Kernels.cuh"
 
 
 
@@ -61,14 +61,15 @@ int snapTransformSize(int dataSize)
 }
 
 void padData(float* unpadded, fComplex* padded, const size_t fftH, const size_t fftW, const size_t hW, const size_t hH, const bool forward=true) {
+	const float norm = 1.0f / (fftW * fftH);
 	for(int x = 0; x < hW; x++)
 		for (int y = 0; y < hH; y++) {
-			if (forward) { // TODO: ugly {
+			if (forward) {
 				padded[fftW * y + x].x = unpadded[hW * y + x];
 				padded[fftW * y + x].y = 0.0f;
 			}	
 			else {
-			unpadded[hW * y + x] = padded[fftW * y + x].x;
+				unpadded[hW * y + x] = padded[fftW * y + x].x * norm;
 			}
 				
 		}
@@ -84,11 +85,8 @@ size_t square_radius(const size_t width, const size_t height, const float cutoff
 
 
 
-void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cutoff_frequencies)
-{
-
-
-	
+void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cutoff_frequencies, const bool isLowPass)
+{	
 	// vars declaration, data-related
 	fComplex * dChannelPadded, *hPadded;
 	// vars declaration, fft-related
@@ -138,15 +136,24 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	// cut frequencies kernel
 	
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
-
-	//cutFrequencies <<<grid, block >>> (
-	//	dDataSpectrum,
-	//	fftHeight,
-	//	fftWidth,
-	//	hHeight,
-	//	hWidth,
-	//	sqradius
-	//);
+	if(isLowPass)
+		lowPassFilter <<<grid, block >>> (
+			dDataSpectrum,
+			fftHeight,
+			fftWidth,
+			hHeight,
+			hWidth,
+			sqradius
+		);
+	else
+		highPassFilter << <grid, block >> > (
+			dDataSpectrum,
+			fftHeight,
+			fftWidth,
+			hHeight,
+			hWidth,
+			sqradius
+			);
 
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
 
@@ -164,9 +171,11 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	
 	// normalize
 	printf("s %f %f", hChannel[0], hChannel[1]);
-	const float norm = 1.0f / (hWidth * hHeight);
+
+	/*const float norm = 1.0f / (fftWidth * fftHeight);
 	for (int j = 0; j < hWidth * hHeight; j++)
-		hChannel[j] = hChannel[j] * norm;
+		hChannel[j] = hChannel[j] * norm;*/
+	
 	printf("s %f %f", hChannel[0], hChannel[1]);
 	// free resources
 	checkCudaErrors(cufftDestroy(fftPlanInv));

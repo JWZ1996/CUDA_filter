@@ -2,6 +2,7 @@
 #include "helper_cuda.h"
 #include <iostream>
 #include <algorithm>
+
 CudaProcessor::CudaProcessor(cv::Mat& input, IGPUFilter& filter) : gpuFilter{ filter }, inputMat(input)
 {
 	inputMat.convertTo(inputMat, CV_32F, 1 / 255.0f);
