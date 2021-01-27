@@ -88,7 +88,7 @@
   <ItemGroup>
     <ClCompile Include="main.cpp" />
     <CudaCompile Include="kernels.cu">
-      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </CudaCompile>
     <CudaCompile Include="src\ConvGPUFilter.cpp" />
     <ClCompile Include="src\CudaProcessor.cpp">
@@ -111,6 +111,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FFTGPU_Common.h" />
+    <ClInclude Include="FFTGPU_Kernels.cuh" />
     <ClInclude Include="include\KernelGenerator.h" />
     <CudaCompile Include="FFTGPUFilter.cuh" />
     <ClInclude Include="include\BaseFilterAdapter.h" />

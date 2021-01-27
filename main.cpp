@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv)
 {
-	std::string filename("test_images\\cat.png");
+	std::string filename("test_images\\frymire.png");
 	cv::Mat input = cv::imread(filename, cv::IMREAD_COLOR);
 	cv::Mat orig = cv::imread(filename, cv::IMREAD_COLOR);
 	cv::imshow(filename, orig);

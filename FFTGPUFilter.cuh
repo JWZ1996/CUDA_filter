@@ -1,10 +1,4 @@
-﻿// Include CUDA runtime and CUFFT
-#include <cuda_runtime.h>
-#include <cufft.h>
-
-// Helper functions for CUDA
-#include <helper_functions.h>
-#include <helper_cuda.h>
+﻿
 
 #include <math.h>
 
@@ -60,7 +54,7 @@ int snapTransformSize(int dataSize)
 	}
 }
 
-void padData(float* unpadded, fComplex* padded, const size_t fftH, const size_t fftW, const size_t hW, const size_t hH, const bool forward=true) {
+void padData(float* unpadded, fComplex* padded, const size_t fftW, const size_t fftH, const size_t hW, const size_t hH, const bool forward=true) {
 	const float norm = 1.0f / (fftW * fftH);
 	for(int x = 0; x < hW; x++)
 		for (int y = 0; y < hH; y++) {
@@ -83,6 +77,67 @@ size_t square_radius(const size_t width, const size_t height, const float cutoff
 	return radius * radius;
 }
 
+__device__ void cufftCallbackShift(
+	void *dataOut,
+	size_t offset,
+	cufftComplex  element,
+	void *callerInfo,
+	void *sharedPointer
+)
+{
+	ImageInfo* i = (ImageInfo*)callerInfo;
+	cufftComplex* out = (cufftComplex*)dataOut;
+
+
+	const int width = i->width;
+	const int centerX = i->centerX;
+	const int centerY = i->centerY;
+
+	const int x = offset % width;
+	const int y = offset / width;
+
+	const int ind = y * width + x;
+	int shiftX, shiftY;
+
+
+
+	// 1q, 2q
+	if (y < centerY) {
+		// 1q to 4q
+		if (x < centerX) {
+			shiftX = x + centerX;
+			shiftY = y + centerY;
+		}
+		//  2q to 3q
+		else {
+			shiftX = x - centerX;
+			shiftY = y + centerY;
+		}
+
+	}
+	// 3q, 4q
+	else {
+		// 3q to 2q
+		if (x < centerX) {
+			shiftX = x + centerX;
+			shiftY = y - centerY;
+		}
+		// 4q to 1q
+		else {
+			shiftX = x - centerX;
+			shiftY = y - centerY;
+		}
+	}
+
+	//const int indShift = shiftY * imageW + shiftX;
+	const int indShift = width * shiftY + shiftX;
+
+	out[ind] = out[indShift];
+
+}
+
+__device__
+cufftCallbackStoreC d_cufftshiftCallback = cufftCallbackShift;
 
 
 void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cutoff_frequencies, const bool isLowPass)
@@ -98,13 +153,20 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 
 	//		spectrum
 	fComplex *dDataSpectrum;
-
+	// callback
+	cufftCallbackStoreC h_cufftCallback;
 
 	size_t fftWidth = snapTransformSize(hWidth);
 	size_t fftHeight = snapTransformSize(hHeight);
 	
 	// calculate transformation radius
 	const size_t sqradius = square_radius(fftWidth, fftHeight, cutoff_frequencies);
+	// info about image
+	ImageInfo imageInfo, *dImageInfo;
+	imageInfo.width = fftWidth;
+	imageInfo.height = fftHeight;
+	imageInfo.centerX = fftWidth >> 1;
+	imageInfo.centerY = fftHeight >> 1;
 	// memory allocalion
 	hPadded = (fComplex *)malloc(fftWidth * fftHeight * sizeof(fComplex));
 	memset(hPadded, 0, fftWidth * fftHeight * sizeof(fComplex));
@@ -112,13 +174,20 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	checkCudaErrors(cudaMalloc((void **)&dChannelPadded, fftWidth * fftHeight * sizeof(fComplex)));
 	checkCudaErrors(cudaMalloc((void **)&dDataSpectrum, fftHeight * fftWidth * sizeof(fComplex)));
 
+	checkCudaErrors(cudaMalloc((void **)&dImageInfo, sizeof(ImageInfo)));
+	checkCudaErrors(cudaMemcpyFromSymbol(
+		&h_cufftCallback,
+		d_cufftshiftCallback,
+		sizeof(h_cufftCallback)
+	));
 	// memory upload
 	const float2 hZero = make_float2(0.0f, 0.0f);
 	cudaMemcpyToSymbol(&dZero, &hZero, sizeof(float2));
-	printf("s %d %d", hWidth, hHeight, sqradius);
+	printf("s %dx%d | fft %dx%d\n", hWidth, hHeight, fftWidth, fftHeight);
 	
 	padData(hChannel, hPadded, fftWidth, fftHeight, hWidth, hHeight);
 	checkCudaErrors(cudaMemcpy(dChannelPadded, hPadded, fftWidth * fftHeight * sizeof(cufftComplex), cudaMemcpyHostToDevice));
+	checkCudaErrors(cudaMemcpy(dImageInfo, &imageInfo, sizeof(ImageInfo), cudaMemcpyHostToDevice));
 	// *************************
 	// *** transformations *****
 	// *************************
@@ -130,11 +199,25 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	// fft convolution
 	checkCudaErrors(cudaDeviceSynchronize());
 	
+	// set callbacks
+	// NOTE: ON LINUX 64bit only!!!
+	/*checkCudaErrors(cufftXtSetCallback(fftPlanFwd,
+		(void **)&h_cufftCallback,
+		CUFFT_CB_ST_COMPLEX,
+		(void**)&dImageInfo
+	));
+	checkCudaErrors(cufftXtSetCallback(fftPlanInv,
+		(void **)&h_cufftCallback,
+		CUFFT_CB_ST_COMPLEX,
+		(void**)&dImageInfo
+	));*/
 	
 	cudaEvent_t start, stop; // pomiar czasu wykonania jądra
 	checkCudaErrors(cudaEventCreate(&start));
 	checkCudaErrors(cudaEventCreate(&stop));
 	checkCudaErrors(cudaEventRecord(start, 0));
+
+
 
 	checkCudaErrors(cufftExecC2C(fftPlanFwd, (cufftComplex *)dChannelPadded, (cufftComplex *)dDataSpectrum, CUFFT_FORWARD));
 
@@ -148,6 +231,7 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	/* ###### KERNELS ###### */
 	// cut frequencies kernel
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
+
 	if(isLowPass)
 		lowPassFilter <<<grid, block >>> (
 			dDataSpectrum,
@@ -165,7 +249,7 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 			hHeight,
 			hWidth,
 			sqradius
-			);
+		);
 
 	fftShift << <grid, block >> > (dDataSpectrum, fftWidth, fftHeight);
 	/* ######### END KERNELS ####### */
@@ -201,5 +285,6 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	checkCudaErrors(cudaFree(dDataSpectrum));
 
 	checkCudaErrors(cudaFree(dChannelPadded));
+	checkCudaErrors(cudaFree(dImageInfo));
 	free(hPadded);
 }
