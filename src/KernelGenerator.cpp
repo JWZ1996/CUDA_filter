@@ -1,4 +1,4 @@
-#include "KernelGenerator.h"
+#include "../include/KernelGenerator.h"
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdlib>

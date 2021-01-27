@@ -3,8 +3,11 @@
 #include <numeric>
 
 #include "../include/GPUFilters.h"
-#include "helper_cuda.h"
-#include "cuda_runtime.h"
+// Include CUDA runtime and CUFFT
+#include <cuda_runtime.h>
+// Helper functions for CUDA
+#include <helper_functions.h>
+#include <helper_cuda.h>
 #include "../include/KernelGenerator.h"
 #include "../include/CompilationFlags.h"
 

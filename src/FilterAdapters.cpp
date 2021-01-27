@@ -1,6 +1,6 @@
 #include "../include/FilterAdapters.h"
 #include "../include/CompilationFlags.h"
-#include "KernelGenerator.h"
+#include "../include/KernelGenerator.h"
 #include <vector>
 
 void CPUFilterAdapter::apply(cv::Mat& img)
@@ -96,7 +96,7 @@ void GPUFilterAdapter::apply(cv::Mat& img)
 
 void FFTGPUFilterAdapter::apply(cv::Mat& img)
 {
-	FFTGPUFilter filter{ img };
+	FFTGPUFilter filter(img);
 
 	CudaProcessor(img, filter).apply();
 }
