@@ -55,7 +55,7 @@ void CudaProcessor::apply()
 		// no resource deallocation?
 	});
 
-	for (int k = 0; k < 3; k++)
+	for (int k = 0; k < inputChannels.size(); k++)
 	{
 		for (int i = 0; i < inputMat.rows; i++)
 		{

@@ -44,6 +44,44 @@ void CPUFilterAdapter::apply(cv::Mat& img)
 		for (int j = 0; j < kernelSize; j++)
 			kernel.at<float>(i, j) = kernelInput[i * kernelSize + j];
 
+// DODANIE OBRAMOWANIA DO ZDJEC
+	int x = FILTER_ORDER,
+		y = FILTER_ORDER;
+
+	if (cols < rows)
+	{
+		int diff = std::abs(cols - rows);
+
+		if (diff % 2 == 0) {
+			cv::copyMakeBorder(img, img, 0, 0, diff / 2, diff / 2, cv::BORDER_CONSTANT);
+			x += (diff / 2);
+		}
+		else {
+			int split = diff / 2;
+
+			cv::copyMakeBorder(img, img, 0, 0, split + 1, split, cv::BORDER_CONSTANT);
+			x += split;
+		}
+
+	}
+	else if (cols > rows) {
+		int diff = std::abs(cols - rows);
+
+		if (diff % 2 == 0) {
+			cv::copyMakeBorder(img, img, diff / 2, diff / 2, 0, 0, cv::BORDER_CONSTANT);
+			y += (diff / 2);
+		}
+		else {
+			int split = diff / 2;
+
+			cv::copyMakeBorder(img, img, split + 1, split, 0, 0, cv::BORDER_CONSTANT);
+			y += split;
+		}
+	}
+
+	cv::copyMakeBorder(img, img, FILTER_ORDER, FILTER_ORDER, FILTER_ORDER, FILTER_ORDER, cv::BORDER_CONSTANT);
+	//--------------------
+
 
 	img.convertTo(img, CV_32F, 1/255.0f);
 	cv::Mat channels[3], merged_photo;
@@ -89,9 +127,60 @@ void CPUFilterAdapter::apply(cv::Mat& img)
 
 void GPUFilterAdapter::apply(cv::Mat& img)
 {
-	ConvGPUFilter filter{ img };
+	const int 
+		cols = img.cols,
+		rows = img.rows;
 
+	int x = FILTER_ORDER,
+		y = FILTER_ORDER;
+
+	if (cols < rows)
+	{
+		int diff = std::abs(cols - rows);
+
+		if (diff % 2 == 0) {
+			cv::copyMakeBorder(img, img, 0, 0, diff/2, diff/2, cv::BORDER_CONSTANT);
+			x += (diff / 2);
+		}
+		else {
+			int split = diff / 2;
+
+			cv::copyMakeBorder(img, img, 0, 0, split + 1, split, cv::BORDER_CONSTANT);
+			x += split;
+		}
+
+	}
+	else if (cols > rows) {
+		int diff = std::abs(cols - rows);
+
+		if (diff % 2 == 0) {
+			cv::copyMakeBorder(img, img, diff / 2, diff / 2, 0, 0, cv::BORDER_CONSTANT);
+			y += (diff / 2);
+		}
+		else {
+			int split = diff / 2;
+
+			cv::copyMakeBorder(img, img, split + 1, split, 0, 0, cv::BORDER_CONSTANT);
+			y += split;
+		}
+	}
+	
+	cv::copyMakeBorder(img, img, FILTER_ORDER, FILTER_ORDER, FILTER_ORDER, FILTER_ORDER, cv::BORDER_CONSTANT);
+	ConvGPUFilter filter{ img };
 	CudaProcessor(img, filter).apply();
+
+#ifdef CONVFILTER3
+	auto rec = cv::Rect(x, y, cols, rows);
+#endif	
+
+#ifdef CONVFILTER2
+	auto rec = cv::Rect(FILTER_ORDER, FILTER_ORDER, cols, rows);
+#endif	
+
+#ifdef CONVFILTER1
+	auto rec = cv::Rect(FILTER_ORDER, FILTER_ORDER, cols, rows);
+#endif
+	//img = img(rec);
 }
 
 void FFTGPUFilterAdapter::apply(cv::Mat& img)
