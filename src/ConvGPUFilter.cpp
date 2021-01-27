@@ -14,6 +14,30 @@
 const int TILE_SIZE = 16;
 __constant__ float KERNEL[(2 * FILTER_ORDER + 1) * (2 * FILTER_ORDER + 1)];
 
+// WERSJA CONVFILTER3 - ze stala maska
+__global__ void ConvFilter3(float* input, float* output, int width, int height) {
+
+	float sum = 0.0f;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+
+	col = col - FILTER_ORDER;
+	row = row - FILTER_ORDER;
+
+	if ((row < (height - (KERNEL_SIZE - FILTER_ORDER)) && row >= 0) && (col < (width - (KERNEL_SIZE - FILTER_ORDER)) && col >= 0)) {
+
+#pragma unroll
+		for (int i = 0; i < KERNEL_SIZE; i++) {
+#pragma unroll
+			for (int j = 0; j < KERNEL_SIZE; j++) {
+
+				sum += input[(row + i) * width + col + j] * KERNEL[i * KERNEL_SIZE + j];
+			}
+
+		}
+		output[row * width + col] = sum;
+	
+
 // WERSJA CONVFILTER2 - ze stala maska
 __global__ void ConvFilter2(float* input, float* output, int width, int height, int kernelSize) {
 
@@ -40,12 +64,7 @@ __global__ void ConvFilter2(float* input, float* output, int width, int height, 
 
 					sum += input[currentRow * width + currentCol] * KERNEL[i * kernelSize + j];
 				}
-				else
-				{
-					sum = 0.0f;
-				}
 			}
-
 		}
 		output[row * width + col] = sum;
 	}
@@ -79,12 +98,7 @@ __global__ void ConvFilter1(float* input,  float*  kernel,
 
 						sum += input[currentRow * width + currentCol] * kernel[i * kernelSize + j];
 					}
-					else
-					{
-						sum = 0.0f;
-					}
 				}
-
 			}
 			output[row * width + col] = sum;
 		}
@@ -142,6 +156,11 @@ void ConvGPUFilter::filter(std::vector<float>& channel)
 	dim3 dimGrid(ceil((float)cols / TILE_SIZE),
 		ceil((float)rows / TILE_SIZE));
 	dim3 dimBlock(TILE_SIZE, TILE_SIZE, 1);
+
+#ifdef CONVFILTER3
+	checkCudaErrors(cudaMemcpyToSymbol(KERNEL, kernelInput, kernelSize * kernelSize * sizeof(float)));
+	ConvFilter3 <<< dimGrid, dimBlock >>> (devInputPhoto, devOutputPhoto, cols, rows);
+#endif	
 
 #ifdef CONVFILTER2
 	checkCudaErrors(cudaMemcpyToSymbol(KERNEL, kernelInput, kernelSize * kernelSize * sizeof(float)));
