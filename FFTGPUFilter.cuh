@@ -154,19 +154,28 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	//		spectrum
 	fComplex *dDataSpectrum;
 	// callback
-	cufftCallbackStoreC h_cufftCallback;
+	
 
 	size_t fftWidth = snapTransformSize(hWidth);
 	size_t fftHeight = snapTransformSize(hHeight);
 	
 	// calculate transformation radius
 	const size_t sqradius = square_radius(fftWidth, fftHeight, cutoff_frequencies);
-	// info about image
+	/* ########## CALLBACK PROCEDURES, UNUSED ON WINDOWS ########## */
+	cufftCallbackStoreC h_cufftCallback;
+	// info about image 
 	ImageInfo imageInfo, *dImageInfo;
 	imageInfo.width = fftWidth;
 	imageInfo.height = fftHeight;
 	imageInfo.centerX = fftWidth >> 1;
 	imageInfo.centerY = fftHeight >> 1;
+	checkCudaErrors(cudaMalloc((void **)&dImageInfo, sizeof(ImageInfo)));
+	checkCudaErrors(cudaMemcpyFromSymbol(
+		&h_cufftCallback,
+		d_cufftshiftCallback,
+		sizeof(h_cufftCallback)
+	));
+	/* ############################################################ */
 	// memory allocalion
 	hPadded = (fComplex *)malloc(fftWidth * fftHeight * sizeof(fComplex));
 	memset(hPadded, 0, fftWidth * fftHeight * sizeof(fComplex));
@@ -174,12 +183,7 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	checkCudaErrors(cudaMalloc((void **)&dChannelPadded, fftWidth * fftHeight * sizeof(fComplex)));
 	checkCudaErrors(cudaMalloc((void **)&dDataSpectrum, fftHeight * fftWidth * sizeof(fComplex)));
 
-	checkCudaErrors(cudaMalloc((void **)&dImageInfo, sizeof(ImageInfo)));
-	checkCudaErrors(cudaMemcpyFromSymbol(
-		&h_cufftCallback,
-		d_cufftshiftCallback,
-		sizeof(h_cufftCallback)
-	));
+	
 	// memory upload
 	const float2 hZero = make_float2(0.0f, 0.0f);
 	cudaMemcpyToSymbol(&dZero, &hZero, sizeof(float2));
@@ -285,6 +289,6 @@ void filter_CUFFT(float* hChannel, size_t hWidth, size_t hHeight, const float cu
 	checkCudaErrors(cudaFree(dDataSpectrum));
 
 	checkCudaErrors(cudaFree(dChannelPadded));
-	checkCudaErrors(cudaFree(dImageInfo));
+	//checkCudaErrors(cudaFree(dImageInfo));
 	free(hPadded);
 }

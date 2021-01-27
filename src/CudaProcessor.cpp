@@ -43,17 +43,16 @@ void CudaProcessor::channelToGpu(cv::Mat& channel)
 void CudaProcessor::apply()
 {
 
-	std::for_each(std::begin(gpuChannelsData), std::end(gpuChannelsData), [this](auto& channel)
-	{
+	
 		// Kanał w osobnym strumieniu
 		// Wersja batchowana
 		auto start = std::chrono::steady_clock::now();
-		gpuFilter.filter(channel);
+		gpuFilter.filterWrapper(gpuChannelsData);
 		auto end = std::chrono::steady_clock::now();
 		std::chrono::duration<double> elapsed_seconds = end - start;
-		std::cout << "Single channel time " << elapsed_seconds.count() << "s\n";
+		std::cout << "Channels time " << elapsed_seconds.count() << "s\n";
 		// no resource deallocation?
-	});
+	
 
 	for (int k = 0; k < inputChannels.size(); k++)
 	{
