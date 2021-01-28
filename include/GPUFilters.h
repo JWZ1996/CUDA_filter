@@ -3,8 +3,10 @@
 
 struct IGPUFilter
 {
+private:
 	virtual void filter(std::vector<float> &channel) = 0;
-
+public:
+	virtual void filterWrapper(std::vector<std::vector<float>>&) = 0;
 };
 
 class BaseGPUFilter : public IGPUFilter
@@ -18,11 +20,12 @@ public:
 
 class ConvGPUFilter : public BaseGPUFilter
 {
-
+private:
+	void filter(std::vector<float> &channel) override;
 public:
 	ConvGPUFilter(cv::Mat& inputImg);
 
-	void filter(std::vector<float> &channel) override;
+	void filterWrapper(std::vector<std::vector<float>>&) override;
 };
 
 class FFTGPUFilter : public BaseGPUFilter
@@ -33,11 +36,11 @@ private:
 	size_t height;
 	size_t cutoff_frequencies = 0.1;
 
-  void filter(cv::Mat channel);
+	void filter(std::vector<float> &channel) override;
 public:
 
 	FFTGPUFilter(cv::Mat& inputImg);
 
-	void filter(std::vector<float> &channel) override;
+	void filterWrapper(std::vector<std::vector<float>>&) override;
 };
 

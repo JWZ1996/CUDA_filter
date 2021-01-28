@@ -1,7 +1,15 @@
 # pragma once
+// Include CUDA runtime and CUFFT
+#include <cuda_runtime.h>
+#include <cufft.h>
+#include <cufftXt.h>
+
+// Helper functions for CUDA
+#include <helper_functions.h>
+#include <helper_cuda.h>
 
 typedef float2 fComplex;
-#include "kernels.cu"
+
 __constant__  float2 dZero;
 
 __global__ void lowPassFilter(
@@ -38,3 +46,25 @@ __global__ void fftShift(
 	int fftH,
 	int fftW
 );
+
+// for cufft callback
+
+struct ImageInfo 
+{
+	size_t width;
+	size_t height;
+	size_t centerX;
+	size_t centerY;
+};
+
+
+__device__ void cufftCallbackShift(
+	void *dataOut,
+	size_t offset,
+	cufftComplex  element,
+	void *callerInfo,
+	void *sharedPointer
+);
+
+
+//#include "kernels.cu"

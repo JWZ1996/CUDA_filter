@@ -33,6 +33,8 @@ __global__ void ConvFilter3(float* input, float* output, int width, int height) 
 
 		}
 		output[row * width + col] = sum;
+	}
+}
 	
 
 // WERSJA CONVFILTER2 - ze stala maska
@@ -102,6 +104,11 @@ __global__ void ConvFilter1(float* input,  float*  kernel,
 }
 
 ConvGPUFilter::ConvGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg) {}
+
+void ConvGPUFilter::filterWrapper(std::vector<std::vector<float>>& channels) 
+{
+	std::for_each(channels.begin(), channels.end(), [&](auto& channel) { filter(channel); });
+}
 
 void ConvGPUFilter::filter(std::vector<float>& channel)
 {
