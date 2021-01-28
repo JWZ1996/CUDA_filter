@@ -60,7 +60,7 @@ void CudaProcessor::apply()
 		{
 			for (int j = 0; j < inputMat.cols; j++)
 			{
-					inputChannels[k].at<float>(i, j) = gpuChannelsData[k][i * inputMat.cols + j];
+				inputChannels[k].at<float>(i, j) = gpuChannelsData[k][i * inputMat.cols + j];
 			}
 		}
 	}

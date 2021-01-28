@@ -233,7 +233,7 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 	checkCudaErrors(cudaHostRegister(hPadded1, fftWidth * fftHeight * sizeof(fComplex), cudaHostRegisterPortable));
 	checkCudaErrors(cudaHostRegister(hPadded2, fftWidth * fftHeight * sizeof(fComplex), cudaHostRegisterPortable));
 
-	
+#define DEBUG
 	
 	// *************************
 	// *** transformations *****
@@ -257,15 +257,18 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 	checkCudaErrors(cudaMemcpyAsync(dChannelPadded[0], hPadded0, fftWidth * fftHeight * sizeof(cufftComplex), cudaMemcpyHostToDevice, streams[0]));
 	checkCudaErrors(cudaMemcpyAsync(dChannelPadded[1], hPadded1, fftWidth * fftHeight * sizeof(cufftComplex), cudaMemcpyHostToDevice, streams[1]));
 	checkCudaErrors(cudaMemcpyAsync(dChannelPadded[2], hPadded2, fftWidth * fftHeight * sizeof(cufftComplex), cudaMemcpyHostToDevice, streams[2]));
+
+#ifdef DEBUG
 	cudaEvent_t start, stop; // pomiar czasu wykonania jądra
 	checkCudaErrors(cudaEventCreate(&start));
 	checkCudaErrors(cudaEventCreate(&stop));
-	checkCudaErrors(cudaEventRecord(start, 0));
-
+	checkCudaErrors(cudaEventRecord(start, streams[0]));
+#endif
+#pragma unroll
 	for (int i = 0; i < STREAMS_NUMBER; i++)
 	{
 		checkCudaErrors(cufftExecC2C(fftPlanFwd[i], (cufftComplex *)dChannelPadded[i], (cufftComplex *)dDataSpectrum[i], CUFFT_FORWARD));
-
+	}
 
 
 		dim3 block(32, 32);
@@ -273,39 +276,46 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 
 		/* ###### KERNELS ###### */
 		// cut frequencies kernel
-		fftShift << <grid, block, i >> > (dDataSpectrum[i], fftWidth, fftHeight);
-		//checkCudaErrors(cudaDeviceSynchronize());
-		if (params.isLowPass)
-			lowPassFilter << <grid, block, i >> > (
-				dDataSpectrum[i],
-				fftHeight,
-				fftWidth,
-				hHeight,
-				hWidth,
-				sqradius
-				);
-		else
-			highPassFilter << <grid, block, i >> > (
-				dDataSpectrum[i],
-				fftHeight,
-				fftWidth,
-				hHeight,
-				hWidth,
-				sqradius
-				);
-		//checkCudaErrors(cudaDeviceSynchronize());
-		fftShift << <grid, block, i>> > (dDataSpectrum[i], fftWidth, fftHeight);
-		/* ######### END KERNELS ####### */
+		//for (int i = 0; i < STREAMS_NUMBER; i++)
+		//	checkCudaErrors(cudaStreamSynchronize(streams[i]));
+#pragma unroll
+		for (int i = 0; i < STREAMS_NUMBER; i++)
+		{
+			fftShift << <grid, block, 0, streams[i] >> > (dDataSpectrum[i], fftWidth, fftHeight);
+			//checkCudaErrors(cudaDeviceSynchronize());
+			if (params.isLowPass)
+				lowPassFilter << <grid, block, 0, streams[i] >> > (
+					dDataSpectrum[i],
+					fftHeight,
+					fftWidth,
+					hHeight,
+					hWidth,
+					sqradius
+					);
+			else
+				highPassFilter << <grid, block, 0, streams[i] >> > (
+					dDataSpectrum[i],
+					fftHeight,
+					fftWidth,
+					hHeight,
+					hWidth,
+					sqradius
+					);
+			//checkCudaErrors(cudaDeviceSynchronize());
+			fftShift << <grid, block, 0, streams[i] >> > (dDataSpectrum[i], fftWidth, fftHeight);
+			/* ######### END KERNELS ####### */
+		}
 
-
-
-
+#pragma unroll
+		for (int i = 0; i < STREAMS_NUMBER; i++)
+		{
 		//// inverse transformation
-		checkCudaErrors(cufftExecC2C(fftPlanInv[i], (cufftComplex *)dDataSpectrum[i], (cufftComplex *)dChannelPadded[i], CUFFT_INVERSE));
+			checkCudaErrors(cufftExecC2C(fftPlanInv[i], (cufftComplex *)dDataSpectrum[i], (cufftComplex *)dChannelPadded[i], CUFFT_INVERSE));
 
-	}
-	
-	checkCudaErrors(cudaEventRecord(stop, 0));
+		}
+
+#ifdef DEBUG
+	checkCudaErrors(cudaEventRecord(stop, streams[0]));
 	checkCudaErrors(cudaEventSynchronize(stop));
 	float elapsedTime;
 	checkCudaErrors(cudaEventElapsedTime(&elapsedTime,
@@ -313,7 +323,7 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 	checkCudaErrors(cudaEventDestroy(start));
 	checkCudaErrors(cudaEventDestroy(stop));
 	printf("GPU (kernel) time = %.3f ms\n", elapsedTime);
-
+#endif
 	
 	checkCudaErrors(cudaMemcpyAsync(hPadded0, dChannelPadded[0], fftWidth  * fftHeight * sizeof(fComplex), cudaMemcpyDeviceToHost, streams[0]));
 	checkCudaErrors(cudaMemcpyAsync(hPadded1, dChannelPadded[1], fftWidth  * fftHeight * sizeof(fComplex), cudaMemcpyDeviceToHost, streams[1]));
@@ -330,6 +340,7 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 	// free resources
 	for (int i = 0; i < STREAMS_NUMBER; i++)
 	{
+		checkCudaErrors(cudaStreamDestroy(streams[i]));
 		checkCudaErrors(cufftDestroy(fftPlanInv[i]));
 		checkCudaErrors(cufftDestroy(fftPlanFwd[i]));
 
@@ -338,6 +349,7 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 		checkCudaErrors(cudaFree(dChannelPadded[i]));
 	}
 	//checkCudaErrors(cudaFree(dImageInfo));
+	cudaDeviceReset();
 	free(hPadded0);
 	free(hPadded1);
 	free(hPadded2);
