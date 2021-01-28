@@ -13,11 +13,23 @@ void KernelGenerator::generateMedianKernel(float* array, int kernelSize)
 
 void KernelGenerator::generateGaussianKernel(float* array, int kernelSize, float sigma)
 {
+	int radius = std::floor(kernelSize >> 1);
+	float sum = 0.0f;
+
 	for (int i = 0; i < kernelSize; i++)
 	{
 		for (int j = 0; j < kernelSize; j++)
 		{
-			array[i * kernelSize + j] = (1 / (2 * M_PI * sigma)) * expf(-(i * i + j * j) / (2 * sigma * sigma));
+			array[i * kernelSize + j] = (1 / (2 * M_PI * sigma)) * expf(-((i - radius) * (i - radius) + (j - radius) * (j - radius)) / (2 * sigma * sigma));
+			sum += (1 / (2 * M_PI * sigma)) * expf(-((i - radius) * (i - radius) + (j - radius) * (j - radius)) / (2 * sigma * sigma));
+		}
+	}
+
+	for (int i = 0; i < kernelSize; i++)
+	{
+		for (int j = 0; j < kernelSize; j++)
+		{
+			array[i * kernelSize + j] = array[i * kernelSize + j] / sum;
 		}
 	}
 }
