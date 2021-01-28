@@ -21,16 +21,18 @@ __global__ void ConvFilter3(float* input, float* output, int width, int height) 
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
 
-	if ((row < (height - (KERNEL_SIZE - FILTER_ORDER)) && row >= 0) && (col < (width - (KERNEL_SIZE - FILTER_ORDER)) && col >= 0)) {
+	int startRow = row - FILTER_ORDER;
+	int startCol = col - FILTER_ORDER;
+
+	if ((startRow < (height - KERNEL_SIZE) && startRow >= 0) && (startCol < (width - KERNEL_SIZE) && startCol >= 0)) {
 
 #pragma unroll
 		for (int i = 0; i < KERNEL_SIZE; i++) {
 #pragma unroll
 			for (int j = 0; j < KERNEL_SIZE; j++) {
 
-				sum += input[(row + i) * width + col + j] * KERNEL[i * KERNEL_SIZE + j];
+				sum += input[(startRow + i) * width + startCol + j] * KERNEL[i * KERNEL_SIZE + j];
 			}
-
 		}
 		output[row * width + col] = sum;
 	}
@@ -38,34 +40,36 @@ __global__ void ConvFilter3(float* input, float* output, int width, int height) 
 	
 
 // WERSJA CONVFILTER2 - ze stala maska
-__global__ void ConvFilter2(float* input, float* output, int width, int height, int kernelSize) {
+__global__ void ConvFilter2(float* input, float* kernel,
+	float* output, int width, int height, int kernelSize) {
+
 
 	float sum = 0.0f;
-	int col = threadIdx.x + blockIdx.x * blockDim.x;
-	int row = threadIdx.y + blockIdx.y * blockDim.y;
-	int maskRowsRadius = kernelSize >> 1;
-	int maskColsRadius = kernelSize >> 1;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int kernelRadius = kernelSize >> 1;
+	int startRow = row - kernelRadius;
+	int startCol = col - kernelRadius;
 
-	if (row < height && col < width) {
+	if ((startRow < (height - KERNEL_SIZE) && startRow >= 0) && (startCol < (width - KERNEL_SIZE) && startCol >= 0)) {
 		sum = 0.0f;
-		int startRow = row - maskRowsRadius;
-		int startCol = col - maskColsRadius;
 
 		for (int i = 0; i < kernelSize; i++) {
-
 			for (int j = 0; j < kernelSize; j++) {
 
 				int currentRow = startRow + i;
 				int currentCol = startCol + j;
 
-				if (currentRow >= 0 && currentRow < height && currentCol >= 0 && currentCol < width)
+				if (currentRow < height && currentCol < width)
 				{
-
 					sum += input[currentRow * width + currentCol] * KERNEL[i * kernelSize + j];
 				}
 			}
+
 		}
+
 		output[row * width + col] = sum;
+
 	}
 }
 
@@ -75,32 +79,33 @@ __global__ void ConvFilter1(float* input,  float*  kernel,
 
 
 	float sum = 0.0f;
-	int col = threadIdx.x + blockIdx.x * blockDim.x;   
-	int row = threadIdx.y + blockIdx.y * blockDim.y;
-	int maskRowsRadius = kernelSize >> 1;
-	int maskColsRadius = kernelSize >> 1;
+	int col = blockIdx.x * blockDim.x + threadIdx.x;   
+	int row = blockIdx.y * blockDim.y + threadIdx.y;
+	int kernelRadius = kernelSize >> 1;
 
-		if (row < height && col < width) {
-			sum = 0.0f;
-			int startRow = row - maskRowsRadius;  
-			int startCol = col - maskColsRadius;  
+	int startRow = row - kernelRadius;
+	int startCol = col - kernelRadius;
 
-			for (int i = 0; i < kernelSize; i++) {
+	if ((startRow < (height - KERNEL_SIZE) && startRow >= 0) && (startCol < (width - KERNEL_SIZE) && startCol >= 0)) {
+		sum = 0.0f;
 
-				for (int j = 0; j < kernelSize; j++) {
+		for (int i = 0; i < kernelSize; i++) {
 
-					int currentRow = startRow + i;
-					int currentCol = startCol + j;
+			for (int j = 0; j < kernelSize; j++) {
 
-					if (currentRow >= 0 && currentRow < height && currentCol >= 0 && currentCol < width) 
-					{
+				int currentRow = startRow + i;
+				int currentCol = startCol + j;
 
-						sum += input[currentRow * width + currentCol] * kernel[i * kernelSize + j];
-					}
+				if (currentRow < height && currentCol < width)
+				{
+					sum += input[currentRow * width + currentCol] * kernel[i * kernelSize + j];
 				}
 			}
-			output[row * width + col] = sum;
 		}
+
+		output[row * width + col] = sum;
+
+	}
 }
 
 ConvGPUFilter::ConvGPUFilter(cv::Mat& inputImg) : BaseGPUFilter(inputImg) {}
