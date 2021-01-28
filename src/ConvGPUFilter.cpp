@@ -21,9 +21,6 @@ __global__ void ConvFilter3(float* input, float* output, int width, int height) 
 	int col = blockIdx.x * blockDim.x + threadIdx.x;
 	int row = blockIdx.y * blockDim.y + threadIdx.y;
 
-	col = col - FILTER_ORDER;
-	row = row - FILTER_ORDER;
-
 	if ((row < (height - (KERNEL_SIZE - FILTER_ORDER)) && row >= 0) && (col < (width - (KERNEL_SIZE - FILTER_ORDER)) && col >= 0)) {
 
 #pragma unroll
