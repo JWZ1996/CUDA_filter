@@ -1,6 +1,7 @@
 ﻿
 
 #include <math.h>
+#include <thread>
 
 #include "FFTGPU_Common.h"
 #include "FFTGPU_Kernels.cuh"
@@ -139,6 +140,20 @@ __device__ void cufftCallbackShift(
 __device__
 cufftCallbackStoreC d_cufftshiftCallback = cufftCallbackShift;
 
+struct ThreadInfo {
+	float* hChannel;
+	fComplex* hPadded;
+	size_t fftWidth, fftHeight, hWidth, hHeight;
+	bool forward;
+	//padData(channel0, hPadded0, fftWidth, fftHeight, hWidth, hHeight);
+};
+
+void thread_routine(ThreadInfo info) {
+	padData(info.hChannel, info.hPadded, info.fftWidth, info.fftHeight, info.hWidth, info.hHeight, info.forward);
+
+
+}
+
 void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Parameters& params)
 {	
 	const size_t STREAMS_NUMBER = 3;
@@ -225,10 +240,28 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 	printf("s %dx%d | fft %dx%d\n", hWidth, hHeight, fftWidth, fftHeight);
 
 	// memory upload
+	ThreadInfo i;
+	i.fftHeight = fftHeight;
+	i.fftWidth = fftWidth;
+	i.hWidth = hWidth;
+	i.hHeight = hHeight;
+	i.forward = true;
+
+	i.hChannel = channel0;
+	i.hPadded = hPadded0;
+	std::thread t0(thread_routine, i);
+	i.hChannel = channel1;
+	i.hPadded = hPadded1;
+	std::thread t1(thread_routine, i);
+	i.hChannel = channel2;
+	i.hPadded = hPadded2;
+	std::thread t2(thread_routine, i);
+	t0.join(); t1.join(); t2.join();
+/*
 	padData(channel0, hPadded0, fftWidth, fftHeight, hWidth, hHeight);
 	padData(channel1, hPadded1, fftWidth, fftHeight, hWidth, hHeight);
 	padData(channel2, hPadded2, fftWidth, fftHeight, hWidth, hHeight);
-
+*/
 	checkCudaErrors(cudaHostRegister(hPadded0, fftWidth * fftHeight * sizeof(fComplex), cudaHostRegisterPortable));
 	checkCudaErrors(cudaHostRegister(hPadded1, fftWidth * fftHeight * sizeof(fComplex), cudaHostRegisterPortable));
 	checkCudaErrors(cudaHostRegister(hPadded2, fftWidth * fftHeight * sizeof(fComplex), cudaHostRegisterPortable));
@@ -331,10 +364,24 @@ void filter_CUFFT(float* channel0, float* channel1, float* channel2, const Param
 
 	checkCudaErrors(cudaDeviceSynchronize());
 	// TODO: add threads
+
+	i.forward = false;
+
+	i.hChannel = channel0;
+	i.hPadded = hPadded0;
+	std::thread t3(thread_routine, i);
+	i.hChannel = channel1;
+	i.hPadded = hPadded1;
+	std::thread t4(thread_routine, i);
+	i.hChannel = channel2;
+	i.hPadded = hPadded2;
+	std::thread t5(thread_routine, i);
+	t3.join(); t4.join(); t5.join();
+/*
 	padData(channel0, hPadded0, fftWidth, fftHeight, hWidth, hHeight, false);
 	padData(channel1, hPadded1, fftWidth, fftHeight, hWidth, hHeight, false);
 	padData(channel2, hPadded2, fftWidth, fftHeight, hWidth, hHeight, false);
-	
+	*/
 	// normalize
 	
 	// free resources
